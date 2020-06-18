@@ -10,14 +10,16 @@ Sys.setlocale("LC_CTYPE", "en_US.UTF-8")
 
 
 # Data Load--------------------------------
-#Remove this business csv from app directory
-app_data <- read.csv("./Final_dataset.csv")
+
+print(Sys.time())
+app_data <- read.csv("./Final_dataset.csv") # with this 33 sec
 
 #Load from rds file
-#app_data <- readRDS("./shinyAppDF.rds")
+#app_data <- readRDS("./shinyAppDF.rds") #Need to create with new test data
 
 #Make business df 
-business_df <- app_data[,names(app_data) %in% c( "business_id","State","City","Address","Latitude","Longitude","Stars","Sub_category")]
+#business_df <- app_data[,names(app_data) %in% c( "business_id","State","City","Address","Latitude","Longitude","Stars","Sub_category")]
+business_df <-app_data[,1:8]
 business_df <- distinct(business_df)
 
 #Get unique city
@@ -26,12 +28,12 @@ uniqueCity=sort(unique(business_df$City))
 uniqueState=sort(unique(business_df$State))
 #Get unique categories
 UniqueType=sort(unique(business_df$Sub_category))
-
+print(UniqueType)
 #busin1 = business_df[1:20,]
 busin1 = business_df
 
 
-
+print(Sys.time())
 
 # Server logic-----------------------------
 
@@ -39,54 +41,65 @@ server <- function(input,output,session) {
   
   #------------------Initial UI load : Start
   
-  withProgress(message = 'Making plot', value = 0, {
-    # Number of times we'll go through the loop
-    n <- 10
+  rv <- reactiveValues()
+  rv$setupComplete <- FALSE
+  observe({
     
-    for (i in 1:n) {
-      
-      #Populate state names
-      output$selectState <- renderUI(
-        selectInput(inputId = "State",
-                    label = "Choose a state:", choices= 
-                      as.character(uniqueState),selected = 'Arizona') #,selected = 'OH'
-      )
-      
-      #Populate city names based on state selected
-      output$selectCity <- renderUI(
-        if(is.null(input$State)) #TODO: Need to remove .. will create junk input
-          selectInput(inputId ="city",label = "Choose a city:", choices= 
-                        as.character(uniqueCity),selected = 'Ahwatukee')
-        else{
-          # Get the data set with the appropriate name
-          cityForState <- sort(unique(business_df[business_df$State == input$State, "City"]))
-          selectInput(inputId ="city",label = "Choose a city:", choices= as.character(cityForState),selected = 'Ahwatukee')
-        }
-        
-      )
-      
-      #Populate different restaurant types
-      output$selectType <- renderUI(
-        selectInput(inputId ="Type",label = "Choose a restuarant type:", choices= 
-                      as.character(UniqueType),selected = 'Bakery') 
-      )
-      
-      #Display map
-      output$mymap <- renderLeaflet({
-        
-        #leaflet(busin1) %>% addTiles()%>% addMarkers(~longitude, ~latitude,popup = paste(busin1$name,"<br>",busin1$address))
-        leaflet(busin1) %>% addTiles()%>% addMarkers(~Longitude, ~Latitude,popup = paste(busin1$address))
-        
-        
-      })
-      
-      # Increment the progress bar, and update the detail text.
-      incProgress(1/n, detail = paste("Doing part", i))
-      
-      # Pause for 0.1 seconds to simulate a long computation.
-      Sys.sleep(0.1)
+  #Populate different restaurant types
+    output$selectType <- renderUI(
+      selectInput(inputId ="Type",label = "Choose a restuarant type:", choices= as.character(UniqueType)
+                    ,selected = 'Bakery') 
+    )
+  #Populate state names
+  output$selectState <- renderUI(
+    selectInput(inputId = "State",
+                label = "Choose a state:", choices= 
+                  as.character(uniqueState),selected = 'Arizona') #,selected = 'OH'
+  )
+  
+  #Populate city names based on state selected
+  output$selectCity <- renderUI(
+    if(is.null(input$State)) #TODO: Need to remove .. will create junk input
+      selectInput(inputId ="city",label = "Choose a city:", choices= 
+                    as.character(uniqueCity),selected = 'Ahwatukee')
+    else{
+      # Get the data set with the appropriate name
+      cityForState <- sort(unique(business_df[business_df$State == input$State, "City"]))
+      selectInput(inputId ="city",label = "Choose a city:", choices= as.character(cityForState),selected = 'Ahwatukee')
     }
+    
+  )
+  
+  
+  
+  #Display map
+  output$mymap <- renderLeaflet({
+    
+    #leaflet(busin1) %>% addTiles()%>% addMarkers(~longitude, ~latitude,popup = paste(busin1$name,"<br>",busin1$address))
+    leaflet(busin1) %>% addTiles()%>% addMarkers(~Longitude, ~Latitude,popup = paste(busin1$address))
+    
+  
+   
   })
+  
+  
+  
+  ## set my condition to TRUE
+  rv$setupComplete <- TRUE
+  ## the conditional panel reads this output
+  output$setupComplete <- reactive({
+   return(rv$setupComplete)
+  })
+  outputOptions(output, 'setupComplete', suspendWhenHidden=FALSE)
+  
+  
+
+  
+  })
+ 
+  
+ 
+ 
   #---------------------Initial UI load : End
   
   
@@ -102,6 +115,11 @@ server <- function(input,output,session) {
        #For RDs file
        tempDF <- app_data %>% filter(City == input$city & Sub_category == input$Type)
        
+       #Split DF in business 
+       tempBusiness_df <-tempDF[,1:8]
+       tempBusiness_df <- distinct(tempBusiness_df)
+       
+       
        resultRowID <- c("Total number of resturants" ,"Average restaurant ratings","Total number of reviews ", "Number of positive reviews","Number of negative reviews")
        
        resultsDF <- data.frame(Summary=resultRowID)
@@ -112,15 +130,16 @@ server <- function(input,output,session) {
          
        }
        else{
-         totalResturant = length(unique(tempDF$business_id))#nrow(unique(tempDF$business_id))
+         totalResturant = as.numeric(nrow(tempBusiness_df))#length(unique(tempDF$business_id))#nrow(unique(tempDF$business_id))
          #avgRestaurantRatings =  unique(tempDF$Stars)#Recheck
-         avgRestaurantRatings = mean(tempDF$Stars)
-         totalReviewCount =nrow(tempDF)
+         avgRestaurantRatings = mean(tempDF$Stars) # Need to check
+         totalReviewCount = nrow(tempDF)
          
-         #Call MOdel pending
+         #Call MOdel 
          modelObject <- readRDS("./final_model_rds.rds")
-         testDf <-tempDF[,9:41]
-         result <- predict(model2,tempDF)
+         #Split DF to get reviews for prediction
+         testDf <-tempDF[,9:42]
+         result <- predict(modelObject,tempDF)
          #table(result)
          
          numberofPositiveReviews = getElement(table(result), "positive")#as.integer(234)
@@ -128,7 +147,7 @@ server <- function(input,output,session) {
          
          
          #resultContent = c(as.numeric(totalResturant) , avgRestaurantRatings , as.integer(totalReviewCount) , as.integer(numberofPositiveReviews), as.integer(numberofNegativeReviews))
-         resultContent = list(as.numeric(totalResturant) , avgRestaurantRatings , as.integer(totalReviewCount) , as.integer(numberofPositiveReviews), as.integer(numberofNegativeReviews))
+         resultContent = list(totalResturant, avgRestaurantRatings , as.integer(totalReviewCount) , as.integer(numberofPositiveReviews), as.integer(numberofNegativeReviews))
          
          
          resultsDF$Count=resultContent
@@ -138,12 +157,12 @@ server <- function(input,output,session) {
        
        output$resultTable <- renderTable(resultsDF)#renderDataTable(resultsDF)
        
-       #output$summary <- renderUI({
-       # summaryText <- paste("<b>Summary of current restaurants of type ",input$Type ,"</b>")
+       output$predictionDetails <- renderUI({
+         predictionText <- paste("<b>Prediction : </b>")
        
-       # HTML(paste(summaryText, sep = '<br/>'))
+          HTML(paste(predictionText, sep = '<br/>'))
        
-       # })
+       })
        #output$summary <- renderUI({
        #  title <- paste("Summary of current restaurant of type ",input$Type)
        # str1 <- paste("Total ", NROW(tempDF), "restuarants are in this are of type ",input$Type )
@@ -155,10 +174,18 @@ server <- function(input,output,session) {
        # })
     
        output$mymap <- renderLeaflet({
+         #ToDo : get name of the business
+         #leaflet(tempBusiness_df) %>% addTiles() %>%
+           #addMarkers(~Longitude, ~Latitude,popup = paste(tempBusiness_df$name,"<br>",
+                                                      #    tempBusiness_df$address))
          
-         leaflet(tempDF) %>% addTiles() %>%
-           addMarkers(~Longitude, ~Latitude,popup = paste(tempDF$name,"<br>",
-                                                          tempDF$address))
+         leaflet(tempBusiness_df) %>% addTiles() %>%
+           addMarkers(~Longitude, ~Latitude,popup = paste(tempBusiness_df$address))
+         
+         #leafletProxy("mymap", data = tempBusiness_df) %>%
+         #  clearShapes() %>% addTiles() %>%
+          # addMarkers(~Longitude, ~Latitude,popup = paste(tempBusiness_df$name,"<br>",
+                                                        #  tempBusiness_df$address))
          
        })
        
@@ -167,7 +194,7 @@ server <- function(input,output,session) {
        
        
        # Increment the progress bar, and update the detail text.
-       incProgress(1/n, detail = paste("Doing part", i))
+       incProgress(1/n, detail = paste("Analyzing"))
        
        # Pause for 0.1 seconds to simulate a long computation.
        Sys.sleep(0.1)
