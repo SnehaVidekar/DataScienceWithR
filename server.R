@@ -61,11 +61,11 @@ server <- function(input,output,session) {
   output$selectCity <- renderUI(
     if(is.null(input$State)) #TODO: Need to remove .. will create junk input
       selectInput(inputId ="city",label = "Choose a city:", choices= 
-                    as.character(uniqueCity),selected = 'Ahwatukee')
+                    as.character(uniqueCity),selected = 'Tempe')
     else{
       # Get the data set with the appropriate name
       cityForState <- sort(unique(business_df[business_df$State == input$State, "City"]))
-      selectInput(inputId ="city",label = "Choose a city:", choices= as.character(cityForState),selected = 'Ahwatukee')
+      selectInput(inputId ="city",label = "Choose a city:", choices= as.character(cityForState),selected = 'Tempe')
     }
     
   )
@@ -75,8 +75,8 @@ server <- function(input,output,session) {
   #Display map
   output$mymap <- renderLeaflet({
     
-    #leaflet(busin1) %>% addTiles()%>% addMarkers(~longitude, ~latitude,popup = paste(busin1$name,"<br>",busin1$address))
-    leaflet(busin1) %>% addTiles()%>% addMarkers(~Longitude, ~Latitude,popup = paste(busin1$address))
+    leaflet(busin1) %>% addTiles()%>% addMarkers(~Longitude, ~Latitude,popup = paste(busin1$name,"<br>",busin1$address))
+    #leaflet(busin1) %>% addTiles()%>% addMarkers(~Longitude, ~Latitude,popup = paste(busin1$address))
     
   
    
@@ -130,10 +130,10 @@ server <- function(input,output,session) {
          
        }
        else{
-         totalResturant = as.numeric(nrow(tempBusiness_df))#length(unique(tempDF$business_id))#nrow(unique(tempDF$business_id))
+         totalResturant <- as.numeric(nrow(tempBusiness_df))#length(unique(tempDF$business_id))#nrow(unique(tempDF$business_id))
          #avgRestaurantRatings =  unique(tempDF$Stars)#Recheck
          avgRestaurantRatings = mean(tempDF$Stars) # Need to check
-         totalReviewCount = nrow(tempDF)
+         totalReviewCount <- as.integer(nrow(tempDF))
          
          #Call MOdel 
          modelObject <- readRDS("./final_model_rds.rds")
@@ -142,12 +142,12 @@ server <- function(input,output,session) {
          result <- predict(modelObject,tempDF)
          #table(result)
          
-         numberofPositiveReviews = getElement(table(result), "positive")#as.integer(234)
+         numberofPositiveReviews = as.integer(getElement(table(result), "positive"))#as.integer(234)
          numberofNegativeReviews = getElement(table(result), "negative")#as.integer(123)
          
          
          #resultContent = c(as.numeric(totalResturant) , avgRestaurantRatings , as.integer(totalReviewCount) , as.integer(numberofPositiveReviews), as.integer(numberofNegativeReviews))
-         resultContent = list(totalResturant, avgRestaurantRatings , as.integer(totalReviewCount) , as.integer(numberofPositiveReviews), as.integer(numberofNegativeReviews))
+         resultContent = list(totalResturant, avgRestaurantRatings , totalReviewCount , as.integer(numberofPositiveReviews), as.integer(numberofNegativeReviews))
          
          
          resultsDF$Count=resultContent
@@ -175,12 +175,11 @@ server <- function(input,output,session) {
     
        output$mymap <- renderLeaflet({
          #ToDo : get name of the business
-         #leaflet(tempBusiness_df) %>% addTiles() %>%
-           #addMarkers(~Longitude, ~Latitude,popup = paste(tempBusiness_df$name,"<br>",
-                                                      #    tempBusiness_df$address))
-         
          leaflet(tempBusiness_df) %>% addTiles() %>%
-           addMarkers(~Longitude, ~Latitude,popup = paste(tempBusiness_df$address))
+           addMarkers(~Longitude, ~Latitude,popup = paste(tempBusiness_df$name,"<br>",tempBusiness_df$address))
+         
+         #leaflet(tempBusiness_df) %>% addTiles() %>%
+        #   addMarkers(~Longitude, ~Latitude,popup = paste(tempBusiness_df$address))
          
          #leafletProxy("mymap", data = tempBusiness_df) %>%
          #  clearShapes() %>% addTiles() %>%
@@ -213,9 +212,10 @@ server <- function(input,output,session) {
  #---------------------Action for reset button : Start
  observeEvent(input$resetButton,{
    updateSelectInput(session,inputId = "State",selected = 'Arizona') #,selected = 'OH'
+   updateSelectInput(session,inputId = "city",selected = 'Tempe')
    updateSelectInput(session,inputId = "Type",selected = 'Bakery') #,selected = 'Bakery'
-   #leaflet(busin1) %>% addTiles() %>% addMarkers(~longitude, ~latitude,popup = paste(busin1$name,"<br>", busin1$address))
-   leaflet(busin1) %>% addTiles()%>% addMarkers(~Longitude, ~Latitude,popup = paste(busin1$address))
+   leaflet(busin1) %>% addTiles() %>% addMarkers(~Longitude, ~Latitude,popup = paste(busin1$name,"<br>", busin1$address))
+   #leaflet(busin1) %>% addTiles()%>% addMarkers(~Longitude, ~Latitude,popup = paste(busin1$address))
  })
   
  #---------------------Action for reset button : End
