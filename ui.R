@@ -37,9 +37,15 @@ ui <-  navbarPage("Desicion support system",
                                    actionButton("searchButton", "Search"),
                                    actionButton("resetButton", "Reset"),
                                    hr(),
+                                  
+                                   #tableOutput('resultTable'),
+                                   conditionalPanel(
+                                     condition = "output.resultDisplayed",
+                                     tableOutput('resultTable'),
+                                     htmlOutput("predictionDetails"),
+                                   ),
                                    
-                                   tableOutput('resultTable'),
-                                   htmlOutput("predictionDetails"),
+                                  
                                    
                                    width=4,fluid = FALSE
                                    
