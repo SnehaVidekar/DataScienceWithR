@@ -7,6 +7,7 @@ library(tidyr)
 library('dplyr')
 #library(e1071)
 library(randomForest)
+library(data.table)
 Sys.setlocale("LC_CTYPE", "en_US.UTF-8")
 
 
@@ -14,12 +15,12 @@ Sys.setlocale("LC_CTYPE", "en_US.UTF-8")
 
 print(Sys.time())
 #app_data <- read.csv("./Final_dataset.csv") # with this 33 sec
-app_data <- read.csv("./final_train_app.csv")
+#app_data <- read.csv("./final_train_app.csv")
 
 #Load from rds file
-#app_data <- readRDS("./shinyAppDF.rds") #Need to create with new test data
+app_data <- readRDS("./shinyAppDF.rds") #Need to create with new test data
 
-#Make business df 
+#------Make business df 
 #business_df <- app_data[,names(app_data) %in% c( "business_id","State","City","Address","Latitude","Longitude","Stars","Sub_category")]
 #business_df <-app_data[,1:8]
 business_df <-app_data[,1:9]
@@ -33,10 +34,17 @@ uniqueState <- sort(unique(business_df$State))
 UniqueType <- sort(unique(business_df$Sub_category))
 #print(UniqueType)
 
-#DF for inital load and reset
+#------DF for inital load and reset
 busin1 <- business_df%>% filter(State == 'Arizona'& City == 'Tempe' & Sub_category == 'Bakery')
 
 print(Sys.time())
+
+#---- Load model
+#Call MOdel e1071
+#modelObject <- readRDS("./final_model_rds.rds")
+
+#Call MOdel random Forest
+modelObject <- readRDS("./rf_dtm_100_new.rds")
 
 # Server logic-----------------------------
 
@@ -48,10 +56,16 @@ server <- function(input,output,session) {
   rv$setupComplete <- FALSE
   rv$resultDisplayed <- FALSE
   observe({
-    
+  
+  #Render prediction details
+    output$HeadText <- renderUI({
+      headTextTemp <- paste("<b> Looking for new restaurant location? </b><br/> <br/>")
+      HTML(paste(headTextTemp,  sep = '<br/>'))
+      
+    })
   #Populate different restaurant types
     output$selectType <- renderUI(
-      selectInput(inputId ="Type",label = "Choose a restuarant type:", choices= as.character(UniqueType)
+      selectInput(inputId ="Type",label = "Choose a restaurant type:", choices= as.character(UniqueType)
                     ,selected = 'Bakery') 
     )
   #Populate state names
@@ -106,7 +120,7 @@ server <- function(input,output,session) {
    withProgress(message = 'Fetching details', value = 0, {
     
      n <- 10
-     thresholdForResturant <- 6
+     thresholdForRestaurant <- 6
      thresholdForRating <- 3
      predictionText <- ""
      
@@ -117,31 +131,30 @@ server <- function(input,output,session) {
        #Split DF in business 
        #tempBusiness_df <-tempDF[,1:8]
        tempBusiness_df <-tempDF[,1:9]
-       tempBusiness_df <- distinct(tempBusiness_df)
+       tempBusiness_df <- distinct(tempBusiness_df)#distinct(tempBusiness_df$business_id)
        
        
-       resultRowID <- c("Total number of resturants" ,"Average restaurant ratings","Total number of reviews ", "Number of positive reviews","Number of negative reviews")
-       
+       # result data frame
+       resultRowID <- c("Total number of restaurants" ,"Average restaurant ratings","Total number of reviews", "Number of positive reviews","Number of negative reviews")
        resultsDF <- data.frame(Summary=resultRowID)
        resultsDF["Count"] <- NA 
        
-       if(is.data.frame(tempDF) && nrow(tempDF)==0){
+       
+       if(is.data.frame(tempDF) && nrow(tempDF)==0){ # No restuarants matching the input criteria
          tempDF <- business_df
-         predictionText <- paste("Not sufficient information available for selected input criteria." )
+         predictionText <- paste("<b>Prediction : </b><br/> Not sufficient information available for selected input criteria." )
          
        }
        else{
-         totalResturant <- as.numeric(nrow(tempBusiness_df))#length(unique(tempDF$business_id))#nrow(unique(tempDF$business_id))
+         totalRestaurant <- nrow(tempBusiness_df)#as.integer(nrow(unique(tempDF$business_id)))#length(unique(tempDF$business_id))#nrow(unique(tempDF$business_id))
          #avgRestaurantRatings =  unique(tempDF$Stars)#Recheck
-         #avgRestaurantRatings <- mean(tempDF$Stars) # Need to check
+         #avgRestaurantRatings <- mean(tempDF$Stars) 
+         
+         # Need to check
          avgRestaurantRatings <- mean(tempDF$Business_Stars)
+         #avgRestaurantRatings <- mean(tempDF$Review_rating)
          totalReviewCount <- as.integer(nrow(tempDF))
          
-         #Call MOdel e1071
-         #modelObject <- readRDS("./final_model_rds.rds")
-         
-         #Call MOdel random Forest
-         modelObject <- readRDS("./rf_dtm_100.rds")
          
          #Split DF to get prediction of reviews
          testDf <- tempDF[,11:35]
@@ -149,45 +162,54 @@ server <- function(input,output,session) {
          
          #table(result)
          
-         numberofPositiveReviews <- as.integer(getElement(table(result), "positive"))#as.integer(234)
-         numberofNegativeReviews <- getElement(table(result), "negative")#as.integer(123)
+         #From old model.. dont delete
+         #numberofPositiveReviews <- as.integer(getElement(table(result), "positive"))#as.integer(234)
+         #numberofNegativeReviews <- getElement(table(result), "negative")#as.integer(123)
+         
+         #for rf_dtm_100_new model
+         numberofPositiveReviews <- as.integer(getElement(table(result), "1"))# check  positive and negative
+         numberofNegativeReviews <- getElement(table(result), "2")
+         
+         #resultContent = c(as.numeric(totalRestaurant) , avgRestaurantRatings , as.integer(totalReviewCount) , as.integer(numberofPositiveReviews), as.integer(numberofNegativeReviews))
+         resultContent <- list(as.integer(totalRestaurant), avgRestaurantRatings , as.integer(totalReviewCount) , as.integer(numberofPositiveReviews), as.integer(numberofNegativeReviews))
          
          
-         #resultContent = c(as.numeric(totalResturant) , avgRestaurantRatings , as.integer(totalReviewCount) , as.integer(numberofPositiveReviews), as.integer(numberofNegativeReviews))
-         resultContent <- list(totalResturant, avgRestaurantRatings , totalReviewCount , as.integer(numberofPositiveReviews), as.integer(numberofNegativeReviews))
-         
+        
          #Populate the summary for prediction
-         resultsDF$Count<- resultContent
+         resultsDF$Count<- resultContent 
          
          #Rule based for prediction result
-         if(totalResturant <= thresholdForResturant ){
+         if(totalRestaurant <= thresholdForRestaurant ){
            if(avgRestaurantRatings <= thresholdForRating){
-             predictionText <- paste("There is potential apportunity in this particular area.")
+             predictionText <- paste("<b>Prediction: Appears to be some potential.</b><br/><br/> Number of restaurant are very low and restaurant rating is also below average.<br/>
+                                     There is an opportunity in this particular area.")
            }
            else {
-             predictionText <- paste("Check additional parameters like city size for further scope." )
+             predictionText <- paste("<b>Prediction: Appears to be some potential.</b><br/><br/> Number of restaurant are very low but restaurant rating is above average.<br/>
+                                     Additional parameters like city size should be considered for further scope." )
            }
            
          }else{
            if(avgRestaurantRatings <= thresholdForRating){
-             predictionText <- paste("Highly recommended." )
+             predictionText <- paste("<b>Prediction: Potential seems to be high.</b><br/><br/> Number of restaurant are very high but restaurant rating is below average.<br/>
+                                     Hence highly recommended." )
            }
            else {
-             predictionText <- paste("Less potential." )
+             predictionText <- paste("<b>Prediction: Potential seems to be low.</b><br/><br/> Number of restaurant are very high and restaurant rating is above average.<br/>
+                                     Less potential to open restaurant of the same type." )
            }
          }
          
        }
-       
+       #Transpose
        
        #Render result summary table
        output$resultTable <- renderTable(resultsDF)#renderDataTable(resultsDF)
        
        #Render prediction details
        output$predictionDetails <- renderUI({
-         predictionTitle <- paste("<b>Prediction : </b>")
-       
-         HTML(paste(predictionTitle, predictionText,  sep = '<br/>'))
+         #predictionTitle <- paste("<b>Prediction : </b> <br/>")
+         HTML(paste( predictionText,  sep = '<br/>'))
        
        })
    

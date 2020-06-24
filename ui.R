@@ -16,7 +16,7 @@ names(r_colors) <- colors()
 # UI Logic-------------------------
 
 
-ui <-  navbarPage("Desicion support system",
+ui <-  navbarPage("Decision support system",
                   tabPanel("Interactive Map",# Sidebar panel for inputs ----
                            div(class="outer",
                                
@@ -28,6 +28,7 @@ ui <-  navbarPage("Desicion support system",
                                
                                conditionalPanel(condition = "output.setupComplete",fluidRow(
                                  sidebarPanel(
+                                   htmlOutput("HeadText"),
                                    uiOutput("selectState"),
                                    br(),
                                    uiOutput("selectCity"),
