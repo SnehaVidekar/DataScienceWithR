@@ -14,13 +14,11 @@ Sys.setlocale("LC_CTYPE", "en_US.UTF-8")
 
 print(Sys.time())
 #app_data <- read.csv("./Final_dataset.csv") # with this 33 sec
-#app_data <- read.csv("./final_train_app.csv")
 
 #Load from rds file
-app_data <- readRDS("./shinyAppDFv6.rds") #Need to create with new test data
+app_data <- readRDS("./shinyAppDFv6.rds") # with 1 sec
 
 #------Make business df 
-#business_df <- app_data[,names(app_data) %in% c( "business_id","State","City","Address","Latitude","Longitude","Stars","Sub_category")]
 
 #business_df <-app_data[,1:9]
 business_df <-app_data[,1:13]
@@ -35,40 +33,29 @@ UniqueType <- sort(unique(business_df$Sub_category))
 #print(UniqueType)
 
 #------DF for inital load and reset
-#busin1 <- business_df%>% filter(State == 'Arizona'& City == 'Tempe' & Sub_category == 'Bakery')
+
 busin1 <- business_df%>% filter(State == 'Arizona'& City == 'Phoenix' & Sub_category == 'Bakery')
 print(Sys.time())
 
 #---- Load model
-#Call MOdel random Forest
-#modelObject <- readRDS("./rf_dtm_100_new.rds")
 
-#Load both models on 25th June
-#randomForestObject <- readRDS("./rf_dtm_100_v1.1.rds")
-#naiveBayesObject <- readRDS("./review_model_bayes_v1.1.rds")
 
-#Load both models on 26th June
+#Load both models 
 randomForestObject <- readRDS("./rf_dtm_500_V1.2.rds")
 naiveBayesObject <- readRDS("./review_model_bayes_V1.2.rds")
 
 #----get colors for marker
 getColor <- function(dfVar) {
   sapply(dfVar$Price_range, function(Price_range) {
-    #"1" = "green","2" = "red","3" = "blue","4" = "grey","Not Available" = "Black"
     
     switch (as.character(Price_range),
-            #"Not Available" = "lightgray","1" = "beige","2" = "orange","3" = "lightred","4" = "darkred"
-            #"Not Available" = "lightgray","1" = "lightblue","2" = "blue","3" = "blue","4" = "darkblue"
-            #"Not Available" = "lightgray","1" = "green","2" = "beige","3" = "orange","4" = "red"
-            "Not Available" = "lightgray","1" = "lightblue","2" = "blue","3" = "blue","4" = "red"
+            "Not Available" = "lightgray","1" = "lightblue","2" = "cadetblue","3" = "cadetblue","4" = "red"
     )
-    
     
   })
 }
 
 
-#-----------------------------
 # Server logic-----------------------------
 
 server <- function(input,output,session) {
@@ -131,39 +118,28 @@ server <- function(input,output,session) {
   #Display map
   output$mymap <- renderLeaflet({
     
-      #$ or 1 = under $10
-      #$$ or 2 = $11-30
-      #$$$ or 3 = $31-60
-      #$$$$ or 4 = over $61
-      
-   #<i class="fas fa-utensils"></i>
+    
     iconsVar <- awesomeIcons(
-      #icon = "restaurant-outline",
-      icon = "utensils",
-      #iconColor = 'black',
-       #library = "fa",
-      lib = "glyphicon",
-      #library = "ion",
+      icon = 'information',
+      library = 'ion',
       markerColor = getColor(busin1)
     )
   
     
     map <- leaflet(busin1,options = leafletOptions(worldCopyJump = F)) %>% addTiles()%>% addAwesomeMarkers(~Longitude, ~Latitude,popup = paste("Name:",busin1$Name,"<br> Address:",busin1$Address,"<br> Rating :",busin1$Business_Stars,
                                                                                      "<br> Outdoor Seating :",busin1$Outdoor_seating,"<br> Take out option :",busin1$Restaurant_takeout,
-                                                                                     "<br> Restaurant delivery :",busin1$Restaurant_delivery,"<br> Price Range :",busin1$Price_range), icon =iconsVar) 
+                                                                                     "<br> Restaurant delivery :",busin1$Restaurant_delivery), icon =iconsVar) 
                                                                
                                                                 
     map %>%
-      addLegend("topright",colors =c("lightgray",  "lightblue", "blue", "red"),
+      addLegend("topright",colors =c("lightgray",  "lightblue", "cadetblue", "red"),
                 labels= c("NA", "under $10","$11-60","over $61"),
                 title = "Price per person:",
-                #labFormat = labelFormat(prefix = "$"),
                 opacity = 1
       )
-    
-    
-    #leaflet(busin1) %>% addTiles()%>% addMarkers(~Longitude, ~Latitude,popup = paste(busin1$address))
-    
+   
+   
+   
   })
   
   
@@ -198,8 +174,8 @@ server <- function(input,output,session) {
        
        #Split DF in business 
        tempBusiness_df <-tempDF[,1:13]
-       #tempBusiness_df <-tempDF[,1:9]
-       tempBusiness_df <- distinct(tempBusiness_df)#distinct(tempBusiness_df$business_id)
+      
+       tempBusiness_df <- distinct(tempBusiness_df)
        
        
        # result data frame
@@ -215,8 +191,6 @@ server <- function(input,output,session) {
        }
        else{
          totalRestaurant <- nrow(tempBusiness_df)#as.integer(nrow(unique(tempDF$business_id)))#length(unique(tempDF$business_id))#nrow(unique(tempDF$business_id))
-         #avgRestaurantRatings =  unique(tempDF$Stars)#Recheck
-         #avgRestaurantRatings <- mean(tempDF$Stars) 
          
          # Need to check
          avgRestaurantRatings <- mean(tempDF$Business_Stars)
@@ -226,7 +200,7 @@ server <- function(input,output,session) {
          
          #Split DF to get prediction of reviews
          testDf <- tempDF[,15:39]
-         #result <- predict(modelObject,testDf)
+        
          if (input$modelType == "nbModel") {
            result <- predict(naiveBayesObject,newdata=testDf,type = "class" )
          }
@@ -242,12 +216,11 @@ server <- function(input,output,session) {
          #numberofNegativeReviews <- getElement(table(result), "negative")#as.integer(123)
          
          #for rf_dtm_100_new model
-         numberofPositiveReviews <- as.integer(getElement(table(result), "2"))# check  positive and negative
+         numberofPositiveReviews <- as.integer(getElement(table(result), "2"))
          numberofNegativeReviews <- getElement(table(result), "1") #Confirmed on 25th June
          
-         #resultContent = c(as.numeric(totalRestaurant) , avgRestaurantRatings , as.integer(totalReviewCount) , as.integer(numberofPositiveReviews), as.integer(numberofNegativeReviews))
-         resultContent <- list(as.integer(totalRestaurant), avgRestaurantRatings , as.integer(totalReviewCount) , as.integer(numberofPositiveReviews), as.integer(numberofNegativeReviews))
          
+         resultContent <- list(as.integer(totalRestaurant), avgRestaurantRatings , as.integer(totalReviewCount) , as.integer(numberofPositiveReviews), as.integer(numberofNegativeReviews))
          
         
          #Populate the summary for prediction
@@ -276,7 +249,7 @@ server <- function(input,output,session) {
          }
          
        }
-       #Transpose
+       
        
        #Render result summary table
        output$resultTable <- renderTable(resultsDF)#renderDataTable(resultsDF)
@@ -292,39 +265,25 @@ server <- function(input,output,session) {
        output$mymap <- renderLeaflet({
          
          iconsVar <- awesomeIcons(
-           #icon = "restaurant-outline",
-           icon = "utensils",
-           #iconColor = 'black',
-           library = "fa",
-           #lib = "glyphicon",
-           #library = "ion",
+           
+           icon = 'information', 
+           library = 'ion',
            markerColor = getColor(tempBusiness_df)
          )
         
-             map<-  leaflet(tempBusiness_df,options = leafletOptions(worldCopyJump = F)) %>% addTiles()%>% 
+             map <-  leaflet(tempBusiness_df,options = leafletOptions(worldCopyJump = F)) %>% addTiles()%>% 
            addAwesomeMarkers(~Longitude, ~Latitude,popup = paste("Name:",tempBusiness_df$Name,"<br> Address:",tempBusiness_df$Address,
                                                           "<br> Rating :",tempBusiness_df$Business_Stars,
                                                           "<br> Outdoor Seating :",tempBusiness_df$Outdoor_seating,"<br> Take out option :",tempBusiness_df$Restaurant_takeout,
-                                                           "<br> Restaurant delivery :",tempBusiness_df$Restaurant_delivery,"<br> Price Range :",tempBusiness_df$Price_range), icon =iconsVar) #, label=~as.character(busin1$Price_range)
+                                                           "<br> Restaurant delivery :",tempBusiness_df$Restaurant_delivery), icon =iconsVar) #, label=~as.character(busin1$Price_range)
          
              map %>%
-               addLegend("topright",colors =c("lightgray",  "lightblue", "blue", "red"),
+               addLegend("topright",colors =c("lightgray",  "lightblue", "cadetblue", "red"),
                          labels= c("NA", "under $10","$11-60","over $61"),
                          title = "Price per person:",
-                         #labFormat = labelFormat(prefix = "$"),
                          opacity = 1
                )
-         #Working
-         #leaflet(tempBusiness_df) %>% addTiles() %>%
-          # addMarkers(~Longitude, ~Latitude,popup = paste(tempBusiness_df$Name,"<br>",tempBusiness_df$Address))
-         
-         #leaflet(tempBusiness_df) %>% addTiles() %>%
-        #   addMarkers(~Longitude, ~Latitude,popup = paste(tempBusiness_df$address))
-         
-         #leafletProxy("mymap", data = tempBusiness_df) %>%
-         #  clearShapes() %>% addTiles() %>%
-          # addMarkers(~Longitude, ~Latitude,popup = paste(tempBusiness_df$name,"<br>",
-                                                        #  tempBusiness_df$address))
+       
          
        })
        
@@ -355,20 +314,16 @@ server <- function(input,output,session) {
  
  #---------------------Action for reset button : Start
  observeEvent(input$resetButton,{
-   updateSelectInput(session,inputId = "State",selected = 'Arizona') #,selected = 'OH'
+   updateSelectInput(session,inputId = "State",selected = 'Arizona')
    updateSelectInput(session,inputId = "city",selected = 'Phoenix')
-   updateSelectInput(session,inputId = "Type",selected = 'Bakery') #,selected = 'Bakery'
+   updateSelectInput(session,inputId = "Type",selected = 'Bakery')
    updateSelectInput(session,inputId = "modelType",selected = 'rmModel') 
    #Display map
    output$mymap <- renderLeaflet({
      
      iconsVar <- awesomeIcons(
-       #icon = "restaurant-outline",
-       icon = "utensils",
-       #iconColor = 'black',
-       #library = "fa",
-       lib = "glyphicon",
-       #library = "ion",
+       icon = 'information',
+       library = 'ion',
        markerColor = getColor(busin1)
      )                                                           
      
@@ -376,18 +331,16 @@ server <- function(input,output,session) {
        addAwesomeMarkers(~Longitude, ~Latitude,popup = paste("Name:",busin1$Name,"<br> Address:",busin1$Address,
                                                       "<br> Rating :",busin1$Business_Stars,
                                                       "<br> Outdoor Seating :",busin1$Outdoor_seating,"<br> Take out option :",busin1$Restaurant_takeout,
-                                                      "<br> Restaurant delivery :",busin1$Restaurant_delivery,"<br> Price Range :",busin1$Price_range), icon =iconsVar)#, label=~as.character(busin1$Price_range)
+                                                      "<br> Restaurant delivery :",busin1$Restaurant_delivery), icon =iconsVar)
      
  map %>%
-   addLegend("topright",colors =c("lightgray",  "lightblue", "blue", "red"),
+   addLegend("topright",colors =c("lightgray",  "lightblue", "cadetblue", "red"),
              labels= c("NA", "under $10","$11-60","over $61"),
              title = "Price per person:",
-             #labFormat = labelFormat(prefix = "$"),
+            
              opacity = 1
    )
-      #working
-     #leaflet(busin1) %>% addTiles()%>% addMarkers(~Longitude, ~Latitude,popup = paste(busin1$Name,"<br>",busin1$Address))
-     #leaflet(busin1) %>% addTiles()%>% addMarkers(~Longitude, ~Latitude,popup = paste(busin1$address))
+     
      
    })
    

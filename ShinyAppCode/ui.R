@@ -59,10 +59,10 @@ ui <-  navbarPage("Decision support system",
                                conditionalPanel(condition = "!output.setupComplete",withSpinner(uiOutput("spinnerDummyID1"), type = 5,color = "#0dc5c1"))
                            )#Div End
                            )
-                           ,#tabPanel end
-                  tabPanel("About",
-                           verbatimTextOutput("about")
-                  )
+                           #,#tabPanel end
+                  #tabPanel("About",
+                 #          verbatimTextOutput("about")
+                  #)
 )
 
 
