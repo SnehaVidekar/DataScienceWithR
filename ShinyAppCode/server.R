@@ -16,7 +16,7 @@ print(Sys.time())
 #app_data <- read.csv("./Final_dataset.csv") # with this 33 sec
 
 #Load from rds file
-app_data <- readRDS("./shinyAppDFv6.rds") # with 1 sec
+app_data <- readRDS("./shinyAppDFv7.rds") # with 1 sec
 
 #------Make business df 
 
@@ -54,6 +54,74 @@ getColor <- function(dfVar) {
     
   })
 }
+
+#-----Function to get score for prediction
+#predScore 
+#0: High Potential
+#1: Medium Potential
+#2: Low Potential
+
+predScoreFunction <- function(positiveReviewCount, negativeReviewCount) {
+  if (positiveReviewCount == 0) {
+    output <- 0 
+  } 
+  else if (negativeReviewCount == 0){
+    output <- 2
+  }
+  
+  if(positiveReviewCount != 0 & negativeReviewCount != 0){
+    
+    ratioOfReviews <- positiveReviewCount / negativeReviewCount
+    
+    if(ratioOfReviews <1){
+      output <- 0 
+    }
+    else if(ratioOfReviews >=1 & ratioOfReviews < 1.5){
+      output <- 1
+    }
+    else if(ratioOfReviews >= 1.5){
+      output <- 2
+    }
+  }
+  return(output)
+}
+
+#-----get prediction
+
+predResultFunction <- function(score,totalRestaurant,avgRestaurantRatings){
+  thresholdForRestaurant <- 6
+  thresholdForRating <- 3
+  
+  if(score==0){ #Todo facilities logic
+    predictionText <- paste("<b>Prediction: Potential seems to be high.</b><br/><br/> Restaurants available in the current city has more negative reviews.<br/>
+                                     Hence highly recommended." )
+  }
+  if(score==1){
+    if(avgRestaurantRatings <= thresholdForRating){
+      predictionText <- paste("<b>Prediction: Potential seems to be high.</b><br/><br/> Positive reviews are more than negative reviews.However, their average rating is below 3(medium). <br/> " )
+    }
+    else{
+      if(totalRestaurant <= thresholdForRestaurant ){
+        predictionText <- paste("<b>Prediction: Potential seems to be high.</b><br/><br/> <br/> " )
+      }
+      else{
+        predictionText <- paste("<b>Prediction: Potential seems to be low.</b><br/><br/> <br/> " )
+      }
+      
+    }
+  }
+  
+  if(score==2){
+    predictionText <- paste("<b>Prediction: Potential seems to be low.</b><br/><br/> Positive reviews of restaurants are significantly high.<br/>
+                                     Less potential to open restaurant of the same type." )
+  }
+ 
+  
+return(predictionText)
+}
+
+
+#-----
 
 
 # Server logic-----------------------------
@@ -164,8 +232,7 @@ server <- function(input,output,session) {
    withProgress(message = 'Fetching details', value = 0, {
     
      n <- 10
-     thresholdForRestaurant <- 6
-     thresholdForRating <- 3
+     
      predictionText <- ""
      
      for (i in 1:n) {
@@ -190,11 +257,22 @@ server <- function(input,output,session) {
          
        }
        else{
-         totalRestaurant <- nrow(tempBusiness_df)#as.integer(nrow(unique(tempDF$business_id)))#length(unique(tempDF$business_id))#nrow(unique(tempDF$business_id))
+         #totalRestaurant <- nrow(tempBusiness_df)#as.integer(nrow(unique(tempDF$business_id)))#length(unique(tempDF$business_id))#nrow(unique(tempDF$business_id))
          
          # Need to check
-         avgRestaurantRatings <- mean(tempDF$Business_Stars)
+        # avgRestaurantRatings <- mean(tempDF$Business_Stars)
          #avgRestaurantRatings <- mean(tempDF$Review_rating)
+         totalReviewCount <- as.integer(nrow(tempDF))
+         
+         
+         #For correct display of result dataframe
+         totalRestaurant <- ((nrow(tempBusiness_df)))#as.integer(nrow(unique(tempDF$business_id)))#length(unique(tempDF$business_id))#nrow(unique(tempDF$business_id))
+         totalRestaurant <- sprintf("%0.0f",totalRestaurant)
+         
+         #class(totalRestaurant)
+         # Need to check
+         avgRestaurantRatings <- mean(tempDF$Business_Stars)
+         avgRestaurantRatings <- sprintf("%0.3f",avgRestaurantRatings)
          totalReviewCount <- as.integer(nrow(tempDF))
          
          
@@ -220,39 +298,21 @@ server <- function(input,output,session) {
          numberofNegativeReviews <- getElement(table(result), "1") #Confirmed on 25th June
          
          
-         resultContent <- list(as.integer(totalRestaurant), avgRestaurantRatings , as.integer(totalReviewCount) , as.integer(numberofPositiveReviews), as.integer(numberofNegativeReviews))
+         resultContent <- list(totalRestaurant, avgRestaurantRatings , totalReviewCount, as.integer(numberofPositiveReviews), as.integer(numberofNegativeReviews))
          
         
          #Populate the summary for prediction
          resultsDF$Count<- resultContent 
          
-         #Rule based for prediction result
-         if(totalRestaurant <= thresholdForRestaurant ){
-           if(avgRestaurantRatings <= thresholdForRating){
-             predictionText <- paste("<b>Prediction: Appears to be some potential.</b><br/><br/> Number of restaurants are very low and restaurant rating is also below average.<br/>
-                                     There is an opportunity in this particular area.")
-           }
-           else {
-             predictionText <- paste("<b>Prediction: Appears to be some potential.</b><br/><br/> Number of restaurants are very low but restaurant rating is above average.<br/>
-                                     Additional parameters like city size should be considered for further scope." )
-           }
-           
-         }else{
-           if(avgRestaurantRatings <= thresholdForRating){
-             predictionText <- paste("<b>Prediction: Potential seems to be high.</b><br/><br/> Number of restaurants are very high but restaurant rating is below average.<br/>
-                                     Hence highly recommended." )
-           }
-           else {
-             predictionText <- paste("<b>Prediction: Potential seems to be low.</b><br/><br/> Number of restaurants are very high and restaurant rating is above average.<br/>
-                                     Less potential to open restaurant of the same type." )
-           }
-         }
+         #Render result summary table
+         output$resultTable <- renderTable(resultsDF)#renderDataTable(resultsDF)
          
-       }
-       
-       
-       #Render result summary table
-       output$resultTable <- renderTable(resultsDF)#renderDataTable(resultsDF)
+         # Get score using model prediction
+         score <- predScoreFunction(as.integer(numberofPositiveReviews), as.integer(numberofNegativeReviews))
+         
+         # Get prediction
+         predictionText <-  predResultFunction(score,totalRestaurant,avgRestaurantRatings)
+     
        
        #Render prediction details
        output$predictionDetails <- renderUI({
@@ -293,7 +353,7 @@ server <- function(input,output,session) {
        # Pause for 0.1 seconds
        Sys.sleep(0.1)
      }
-   })
+   }})
   #------------------------------------
 
   
@@ -305,10 +365,7 @@ server <- function(input,output,session) {
    })
    outputOptions(output, 'resultDisplayed', suspendWhenHidden=FALSE)
    
-   
-   
-   
-  })
+})
  #---------------------Action for search : End
  
  
