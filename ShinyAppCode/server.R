@@ -151,7 +151,7 @@ predResultFunction <- function(score,totalRestaurant,avgRestaurantRatings,mode_t
     else{
       if(totalRestaurant <= thresholdForRestaurant ){#Todo facilities logic
         txt1 <- paste("<b>Prediction: Potential seems to be high.</b><br/>") 
-        txt2 <- paste("Both positive reviews and average restaurant rating are high. There is a requirement for this cusine owing to low number of restaurants with such offering. <br/>") 
+        txt2 <- paste("Both, positive reviews and average restaurant rating are high. There is a high requirement for this cusine owing to low number of restaurants with such offering. <br/>") 
         predictionTextOut <- paste( txt1,txt2,facilitiesTxt,  sep = '<br/>') 
       }
       else{
@@ -168,7 +168,7 @@ predResultFunction <- function(score,totalRestaurant,avgRestaurantRatings,mode_t
     
     if(totalRestaurant <= thresholdForRestaurant ){#Todo facilities logic
       txt1 <- paste("<b>Prediction: Potential seems to be high.</b><br/>") 
-      txt2 <- paste("Both positive reviews and average restaurant rating are high. There is a requirement for this cusine owing to low number of restaurants with such offering. <br/>") 
+      txt2 <- paste("Both, positive reviews and average restaurant rating are high. There is a high requirement for this cusine owing to low number of restaurants with such offering. <br/>") 
       predictionTextOut <- paste( txt1,txt2,facilitiesTxt,  sep = '<br/>')
     }
     else{
@@ -323,10 +323,10 @@ server <- function(input,output,session) {
        else{
          #For correct display of result dataframe
          totalRestaurant <- ((nrow(tempBusiness_df)))#as.integer(nrow(unique(tempDF$business_id)))#length(unique(tempDF$business_id))#nrow(unique(tempDF$business_id))
-         totalRestaurant <- sprintf("%0.0f",totalRestaurant)
+        
         
          avgRestaurantRatings <- mean(tempDF$Business_Stars)
-         avgRestaurantRatings <- sprintf("%0.3f",avgRestaurantRatings)
+         
          
          totalReviewCount <- as.integer(nrow(tempDF))
          
@@ -342,8 +342,6 @@ server <- function(input,output,session) {
          }
          
          
-         #table(result)
-         
          #From old model.. dont delete
          #numberofPositiveReviews <- as.integer(getElement(table(result), "positive"))#as.integer(234)
          #numberofNegativeReviews <- getElement(table(result), "negative")#as.integer(123)
@@ -351,13 +349,6 @@ server <- function(input,output,session) {
          #for rf_dtm_100_new model
          numberofPositiveReviews <- as.integer(getElement(table(result), "2"))
          numberofNegativeReviews <- getElement(table(result), "1") #Confirmed on 25th June
-         
-         
-         resultContent <- list(totalRestaurant, avgRestaurantRatings , totalReviewCount, as.integer(numberofPositiveReviews), as.integer(numberofNegativeReviews))
-         
-        
-         #Populate the summary for prediction
-         resultsDF$Count<- resultContent 
          
          
          # Get score using model prediction
@@ -368,9 +359,17 @@ server <- function(input,output,session) {
          mode_delivery <- names(sort(-table(tempBusiness_df[12])))[1]
          mode_seating <- names(sort(-table(tempBusiness_df[13])))[1]
          
-         # Get prediction
+         # Get prediction reason
          predictionText <-  predResultFunction(score,totalRestaurant,avgRestaurantRatings,mode_takeout,mode_delivery,mode_seating)
      
+         #Format the int values for summary
+         totalRestaurant <- sprintf("%0.0f",totalRestaurant)
+         avgRestaurantRatings <- sprintf("%0.3f",avgRestaurantRatings)
+         
+         resultContent <- list(totalRestaurant, avgRestaurantRatings , totalReviewCount, as.integer(numberofPositiveReviews), as.integer(numberofNegativeReviews))
+         
+         #Populate the summary for prediction
+         resultsDF$Count<- resultContent 
        }
        
        
